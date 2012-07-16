@@ -52,13 +52,15 @@ public class PackageInternalsFinder {
 				for (String string : cc) {
 					System.err.println("Looking for: "+packageName+ " Found: "+string);
 					URL u = b.getResource(string);
-					System.err.println(string+" u: "+u.toURI());
-					try {
-						final CustomJavaFileObject customJavaFileObject = new CustomJavaFileObject(string, u.toURI(),u.openStream());
-						System.err.println("Name: "+customJavaFileObject.getName()+" kinds: "+kinds+" recurse: "+recurse);
-						result.add(customJavaFileObject);
-					} catch (Exception e) {
-						e.printStackTrace();
+					if(u!=null) {
+						System.err.println(string+" u: "+u.toURI());
+						try {
+							final CustomJavaFileObject customJavaFileObject = new CustomJavaFileObject(string, u.toURI(),u.openStream());
+							System.err.println("Name: "+customJavaFileObject.getName()+" kinds: "+kinds+" recurse: "+recurse);
+							result.add(customJavaFileObject);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
 					}
 				}
 				System.err.println("Result size: "+result.size());

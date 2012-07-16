@@ -213,7 +213,11 @@ public class Activator implements BundleActivator {
 		CompilationTask task = compiler.getTask(null, ccjfm, listener, Arrays.asList(options), null, fileObjects);
 		task.call();
 		CustomJavaFileObject jfo = (CustomJavaFileObject) ccjfm.getJavaFileForInput(StandardLocation.CLASS_OUTPUT, "mathtest.Calculator", Kind.CLASS);
-		System.err.println("jfo: "+jfo.getSize());
+		if (jfo==null) {
+			System.err.println("compile failed?");
+		} else {
+			System.err.println("jfo: "+jfo.getSize());
+		}
 	}
 	
 
@@ -233,6 +237,7 @@ public class Activator implements BundleActivator {
                                                             "public class Calculator { \n"
                                                            + "  public void testAdd() { "
                                                            + "    System.out.println(200+300); \n"
+                                                           + "    com.dexels.navajo.document.Navajo aaaa; \n"
                                                            + "   testcompiler.Activator a = new testcompiler.Activator();} \n"
                                                            + "  public static void main(String[] args) { \n"
                                                            + "    Calculator cal = new Calculator(); \n"
