@@ -1,0 +1,14 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: TestCompiler
+Bundle-SymbolicName: TestCompiler
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: testcompiler.Activator
+Import-Package: org.apache.commons.io,
+ org.apache.tools.ant,
+ org.osgi.framework;version="1.6.0",
+ org.osgi.framework.wiring;version="1.0.0"
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Require-Bundle: com.dexels.navajo.core;bundle-version="2.9.10"
+Bundle-ClassPath: lib/ecj-3.7.jar,
+ .
