@@ -1,6 +1,7 @@
 package testcompiler.atamur;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
@@ -13,6 +14,7 @@ import javax.tools.FileObject;
 import javax.tools.ForwardingJavaFileManager;
 import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
+import javax.tools.JavaFileObject.Kind;
 import javax.tools.StandardLocation;
 
 import org.osgi.framework.BundleContext;
@@ -34,7 +36,7 @@ public class CustomClassloaderJavaFileManager extends
 		super(standardFileManager);
 		this.classLoader = classLoader;
 		this.standardFileManager = standardFileManager;
-		finder = new PackageInternalsFinder();
+		finder = new PackageInternalsFinder(context);
 	}
 
 	@Override
@@ -44,16 +46,10 @@ public class CustomClassloaderJavaFileManager extends
 
 	@Override
 	public String inferBinaryName(Location location, JavaFileObject file) {
-		System.err.println("INFERrrr: " + file);
 		if (file instanceof CustomJavaFileObject) {
 			final String binaryName = ((CustomJavaFileObject) file).binaryName();
-//			if (binaryName.indexOf('.') < 0) {
-//				return binaryName;
-//			}
-			System.err.println("INFER: " + binaryName);
 			String stripped = binaryName.substring(
 					binaryName.lastIndexOf("/") + 1, binaryName.indexOf('.'));
-			System.err.println(">>>>Binary name: " + stripped);
 			return stripped;
 		} else { // if it's not CustomJavaFileObject, then it's coming from
 					// standard file manager - let it handle the file
@@ -82,8 +78,16 @@ public class CustomClassloaderJavaFileManager extends
 	 @Override
 	 public JavaFileObject getJavaFileForInput(Location location, String
 	 className, JavaFileObject.Kind kind) throws IOException {
-			String binaryName = className + ".class";
+			String binaryName = className.replaceAll("\\.", "/");
+		 if(kind.equals(Kind.CLASS)) {
+			 binaryName = binaryName + ".class";
+		 } else {
+			 binaryName = binaryName+".java";
+		 }
 			CustomJavaFileObject cjfo =  fileMap.get(binaryName); 
+			if(cjfo==null) {
+				System.err.println("File not found? keys: "+fileMap.keySet());
+			}
 			return cjfo;
 	 }
 	
@@ -92,13 +96,13 @@ public class CustomClassloaderJavaFileManager extends
 			String className, JavaFileObject.Kind kind, FileObject sibling)
 			throws IOException {
 		// throw new UnsupportedOperationException();
-		String binaryName = className + ".class";
-		URI uri = URI.create("string:///" + binaryName);
+		String binaryName = className.replaceAll("\\.","/" ) + kind.extension;
+		URI uri = URI.create("file:///" + binaryName);
 		CustomJavaFileObject cjfo =  fileMap.get(binaryName); //new CustomJavaFileObject(binaryName, uri,fileMap.get(uri.toString()));
 		if(cjfo==null) {
 			System.err.println("filemap: "+fileMap);
 			System.err.println("bin: "+binaryName);
-			cjfo = new CustomJavaFileObject(binaryName, uri,null);
+			cjfo = new CustomJavaFileObject(binaryName, uri,(InputStream)null,kind);
 			fileMap.put(binaryName, cjfo);
 			
 		}
@@ -137,6 +141,7 @@ public class CustomClassloaderJavaFileManager extends
 	@Override
 	public Iterable<JavaFileObject> list(Location location, String packageName,
 			Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
+		System.err.println("AAAAAAAAAA\nAAAAAAAAAA");
 		if (location == StandardLocation.PLATFORM_CLASS_PATH) { // let standard
 																// manager
 																// hanfle
@@ -156,8 +161,8 @@ public class CustomClassloaderJavaFileManager extends
 						recurse);
 			} else { // app specific classes are here
 				try {
-					final List<JavaFileObject> find = finder.find(packageName,
-							kinds, recurse);
+//					final List<JavaFileObject> find = finder.find(packageName,kinds, recurse);
+					final List<JavaFileObject> find = finder.findAll(packageName);
 					for (JavaFileObject javaFileObject : find) {
 						fileMap.put(((CustomJavaFileObject) javaFileObject)
 								.binaryName(),

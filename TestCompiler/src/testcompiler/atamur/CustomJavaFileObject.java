@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
@@ -25,20 +26,29 @@ public class CustomJavaFileObject implements JavaFileObject {
 	private final URI uri;
 	private final String name;
 	private ByteArrayOutputStream baos;
-
-	public CustomJavaFileObject(String binaryName, URI uri, InputStream is) {
+	private Kind kind;
+	
+	
+	public CustomJavaFileObject(String binaryName, URI uri, Kind kind, String s) {
+		
+		this(binaryName,uri,new ByteArrayInputStream(s.getBytes()),kind);
+		System.err.println("Created file with name: "+binaryName);
+	}
+	
+	public CustomJavaFileObject(String binaryName, URI uri, InputStream is,Kind kind) {
 		this.uri = uri;
 		this.binaryName = binaryName;
+		this.kind = kind;
 		String stripName = binaryName;
 		if(stripName.endsWith("/")) {
 			stripName = stripName.substring(0,stripName.length()-1);
 		}
-		name = binaryName; //.substring(binaryName.lastIndexOf('/')+1);
+		name = binaryName.substring(binaryName.lastIndexOf('/')+1)+kind.extension;
 		if(is!=null) {
 			baos = new ByteArrayOutputStream();
 			try {
 				IOUtils.copy(is, baos);
-				System.err.println("Bin: "+binaryName+"  >>>> file size: "+baos.toByteArray().length);
+//				System.err.println("Bin: "+binaryName+"  >>>> file size: "+baos.toByteArray().length);
 			} catch (MalformedURLException e) {
 				e.printStackTrace();
 			} catch (IOException e) {
@@ -73,12 +83,16 @@ public class CustomJavaFileObject implements JavaFileObject {
 
 	@Override
 	public Reader openReader(boolean ignoreEncodingErrors) throws IOException {
-		throw new UnsupportedOperationException();
+		return new InputStreamReader(openInputStream());
 	}
 
 	@Override
 	public CharSequence getCharContent(boolean ignoreEncodingErrors)
 			throws IOException {
+		if(baos!=null) {
+			byte[] b = baos.toByteArray();
+			return new String(b);
+		}
 		throw new UnsupportedOperationException();
 	}
 
@@ -99,9 +113,12 @@ public class CustomJavaFileObject implements JavaFileObject {
 
 	@Override
 	public Kind getKind() {
-		return Kind.CLASS;
+		return kind;
 	}
 
+	public void setKind(Kind k) {
+		this.kind = k;
+	}
 	@Override
 	// copied from SImpleJavaFileManager
 	public boolean isNameCompatible(String simpleName, Kind kind) {
