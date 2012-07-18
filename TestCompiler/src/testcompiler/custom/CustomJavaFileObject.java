@@ -1,4 +1,4 @@
-package testcompiler.atamur;
+package testcompiler.custom;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

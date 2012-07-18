@@ -1,7 +1,6 @@
 package testcompiler;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -9,19 +8,13 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
 import java.util.Locale;
-import java.util.Set;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticListener;
-import javax.tools.FileObject;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaCompiler.CompilationTask;
-import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
-import javax.tools.JavaFileManager.Location;
 import javax.tools.JavaFileObject.Kind;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
@@ -32,8 +25,8 @@ import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.wiring.BundleWiring;
 
-import testcompiler.atamur.CustomClassloaderJavaFileManager;
-import testcompiler.atamur.CustomJavaFileObject;
+import testcompiler.custom.CustomClassloaderJavaFileManager;
+import testcompiler.custom.CustomJavaFileObject;
 
 public class Activator implements BundleActivator {
 
@@ -69,7 +62,6 @@ public class Activator implements BundleActivator {
 	
 	public void start(BundleContext bundleContext) throws Exception {
 		Activator.context = bundleContext;
-		final File test_src     = new File("javasrc");
 		
 		compiler = ToolProvider.getSystemJavaCompiler();
 		compilerOutputListener = new DiagnosticListener<JavaFileObject>() {
