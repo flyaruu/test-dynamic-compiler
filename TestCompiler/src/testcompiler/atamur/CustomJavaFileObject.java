@@ -17,38 +17,27 @@ import javax.tools.JavaFileObject;
 
 import org.apache.commons.io.IOUtils;
 
-/**
- * @author atamur
- * @since 15-Oct-2009
- */
 public class CustomJavaFileObject implements JavaFileObject {
 	private final String binaryName;
 	private final URI uri;
-	private final String name;
+	private String name;
 	private ByteArrayOutputStream baos;
 	private Kind kind;
-	
-	
-	public CustomJavaFileObject(String binaryName, URI uri, Kind kind, String s) {
-		
-		this(binaryName,uri,new ByteArrayInputStream(s.getBytes()),kind);
-		System.err.println("Created file with name: "+binaryName);
-	}
-	
-	public CustomJavaFileObject(String binaryName, URI uri, InputStream is,Kind kind) {
+
+	public CustomJavaFileObject(String javaObjectName, URI uri, InputStream is,
+			Kind kind) {
 		this.uri = uri;
-		this.binaryName = binaryName;
+		this.binaryName = javaObjectName;
 		this.kind = kind;
-		String stripName = binaryName;
-		if(stripName.endsWith("/")) {
-			stripName = stripName.substring(0,stripName.length()-1);
+		String stripName = javaObjectName;
+		if (stripName.endsWith("/")) {
+			stripName = stripName.substring(0, stripName.length() - 1);
 		}
-		name = binaryName.substring(binaryName.lastIndexOf('/')+1)+kind.extension;
-		if(is!=null) {
+		name = javaObjectName.substring(javaObjectName.lastIndexOf('/') + 1);
+		if (is != null) {
 			baos = new ByteArrayOutputStream();
 			try {
 				IOUtils.copy(is, baos);
-//				System.err.println("Bin: "+binaryName+"  >>>> file size: "+baos.toByteArray().length);
 			} catch (MalformedURLException e) {
 				e.printStackTrace();
 			} catch (IOException e) {
@@ -64,10 +53,10 @@ public class CustomJavaFileObject implements JavaFileObject {
 
 	@Override
 	public InputStream openInputStream() throws IOException {
-		
+
 		final byte[] byteArray = baos.toByteArray();
-		System.err.println("#Bytes "+byteArray.length);
-		return new ByteArrayInputStream(byteArray); // easy way to handle any URI!
+		System.err.println("#Bytes " + byteArray.length);
+		return new ByteArrayInputStream(byteArray);
 	}
 
 	@Override
@@ -89,7 +78,7 @@ public class CustomJavaFileObject implements JavaFileObject {
 	@Override
 	public CharSequence getCharContent(boolean ignoreEncodingErrors)
 			throws IOException {
-		if(baos!=null) {
+		if (baos != null) {
 			byte[] b = baos.toByteArray();
 			return new String(b);
 		}
@@ -119,8 +108,8 @@ public class CustomJavaFileObject implements JavaFileObject {
 	public void setKind(Kind k) {
 		this.kind = k;
 	}
+
 	@Override
-	// copied from SImpleJavaFileManager
 	public boolean isNameCompatible(String simpleName, Kind kind) {
 		String baseName = simpleName + kind.extension;
 		return kind.equals(getKind())
@@ -148,11 +137,11 @@ public class CustomJavaFileObject implements JavaFileObject {
 	}
 
 	public int getSize() {
-		if (baos==null) {
+		if (baos == null) {
 			return -1;
 		} else {
 			return baos.size();
 		}
-		
+
 	}
 }

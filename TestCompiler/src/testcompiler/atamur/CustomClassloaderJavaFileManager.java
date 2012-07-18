@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -17,26 +18,39 @@ import javax.tools.JavaFileObject;
 import javax.tools.JavaFileObject.Kind;
 import javax.tools.StandardLocation;
 
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.BundleEvent;
+import org.osgi.framework.BundleListener;
+import org.osgi.framework.wiring.BundleCapability;
+import org.osgi.framework.wiring.BundleWiring;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author atamur
  * @since 15-Oct-2009
  */
 public class CustomClassloaderJavaFileManager extends
-		ForwardingJavaFileManager<JavaFileManager> implements JavaFileManager {
+		ForwardingJavaFileManager<JavaFileManager> implements JavaFileManager,
+		BundleListener {
 	private final ClassLoader classLoader;
 	private final JavaFileManager standardFileManager;
-	private final PackageInternalsFinder finder;
 
+	private final Map<String, CustomJavaFileFolder> folderMap = new HashMap<String, CustomJavaFileFolder>();
 	private final Map<String, CustomJavaFileObject> fileMap = new HashMap<String, CustomJavaFileObject>();
+	private BundleContext bundleContext;
+	
+	private final static Logger logger = LoggerFactory
+			.getLogger(CustomClassloaderJavaFileManager.class);
 
 	public CustomClassloaderJavaFileManager(BundleContext context,
 			ClassLoader classLoader, JavaFileManager standardFileManager) {
 		super(standardFileManager);
 		this.classLoader = classLoader;
 		this.standardFileManager = standardFileManager;
-		finder = new PackageInternalsFinder(context);
+		this.bundleContext = context;
+		this.bundleContext.addBundleListener(this);
 	}
 
 	@Override
@@ -47,64 +61,54 @@ public class CustomClassloaderJavaFileManager extends
 	@Override
 	public String inferBinaryName(Location location, JavaFileObject file) {
 		if (file instanceof CustomJavaFileObject) {
-			final String binaryName = ((CustomJavaFileObject) file).binaryName();
-			String stripped = binaryName.substring(
-					binaryName.lastIndexOf("/") + 1, binaryName.indexOf('.'));
-			return stripped;
-		} else { // if it's not CustomJavaFileObject, then it's coming from
-					// standard file manager - let it handle the file
+			String binaryName = ((CustomJavaFileObject) file).binaryName();
+			if (binaryName.indexOf('/') >= 0) {
+				binaryName = binaryName
+						.substring(binaryName.lastIndexOf("/") + 1);
+			}
+			if (binaryName.indexOf('.') >= 0) {
+				binaryName = binaryName.substring(0, binaryName.indexOf('.'));
+			}
+			return binaryName;
+		} else {
 			return standardFileManager.inferBinaryName(location, file);
 		}
 	}
 
-	// @Override
-	// public boolean isSameFile(FileObject a, FileObject b) {
-	// throw new UnsupportedOperationException();
-	// }
-	//
-	// @Override
-	// public boolean handleOption(String current, Iterator<String> remaining) {
-	// throw new UnsupportedOperationException();
-	// }
-	//
 	@Override
 	public boolean hasLocation(Location location) {
-		final boolean b = location == StandardLocation.CLASS_PATH
-				|| location == StandardLocation.PLATFORM_CLASS_PATH;
-		System.err.println("Has: " + location + "? " + location);
-		return b;
+		return true;
 	}
 
-	 @Override
-	 public JavaFileObject getJavaFileForInput(Location location, String
-	 className, JavaFileObject.Kind kind) throws IOException {
-			String binaryName = className.replaceAll("\\.", "/");
-		 if(kind.equals(Kind.CLASS)) {
-			 binaryName = binaryName + ".class";
-		 } else {
-			 binaryName = binaryName+".java";
-		 }
-			CustomJavaFileObject cjfo =  fileMap.get(binaryName); 
-			if(cjfo==null) {
-				System.err.println("File not found? keys: "+fileMap.keySet());
-			}
-			return cjfo;
-	 }
-	
+	@Override
+	public JavaFileObject getJavaFileForInput(Location location,
+			String className, JavaFileObject.Kind kind) throws IOException {
+		String binaryName = className.replaceAll("\\.", "/");
+		if (kind.equals(Kind.CLASS)) {
+			binaryName = binaryName + ".class";
+		} else {
+			binaryName = binaryName + ".java";
+		}
+		CustomJavaFileObject cjfo = fileMap.get(binaryName);
+		if (cjfo == null) {
+		}
+		return cjfo;
+	}
+
 	@Override
 	public JavaFileObject getJavaFileForOutput(Location location,
 			String className, JavaFileObject.Kind kind, FileObject sibling)
 			throws IOException {
-		// throw new UnsupportedOperationException();
-		String binaryName = className.replaceAll("\\.","/" ) + kind.extension;
+		String binaryName = className.replaceAll("\\.", "/") + kind.extension;
 		URI uri = URI.create("file:///" + binaryName);
-		CustomJavaFileObject cjfo =  fileMap.get(binaryName); //new CustomJavaFileObject(binaryName, uri,fileMap.get(uri.toString()));
-		if(cjfo==null) {
-			System.err.println("filemap: "+fileMap);
-			System.err.println("bin: "+binaryName);
-			cjfo = new CustomJavaFileObject(binaryName, uri,(InputStream)null,kind);
+		CustomJavaFileObject cjfo = fileMap.get(binaryName); // new
+																// CustomJavaFileObject(binaryName,
+																// uri,fileMap.get(uri.toString()));
+		if (cjfo == null) {
+			cjfo = new CustomJavaFileObject(binaryName, uri,
+					(InputStream) null, kind);
 			fileMap.put(binaryName, cjfo);
-			
+
 		}
 		return cjfo;
 	}
@@ -112,67 +116,33 @@ public class CustomClassloaderJavaFileManager extends
 	@Override
 	public FileObject getFileForInput(Location location, String packageName,
 			String relativeName) throws IOException {
-		System.err.println("Hetting location: " + location.getName()
-				+ " pack: " + packageName + " rel: " + relativeName);
 		JavaFileObject jf = fileMap.get(location.getName());
 		if (jf != null) {
 			return jf;
 		}
 		return super.getFileForInput(location, packageName, relativeName);
-		// throw new UnsupportedOperationException();
 	}
-
-	// @Override
-	// public FileObject getFileForOutput(Location location, String packageName,
-	// String relativeName, FileObject sibling) throws IOException {
-	// throw new UnsupportedOperationException();
-	// }
-
-	// @Override
-	// public void flush() throws IOException {
-	// // do nothing
-	// }
-	//
-	// @Override
-	// public void close() throws IOException {
-	// // do nothing
-	// }
 
 	@Override
 	public Iterable<JavaFileObject> list(Location location, String packageName,
 			Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
-		System.err.println("AAAAAAAAAA\nAAAAAAAAAA");
-		if (location == StandardLocation.PLATFORM_CLASS_PATH) { // let standard
-																// manager
-																// hanfle
+		if (location == StandardLocation.PLATFORM_CLASS_PATH) {
 			return standardFileManager.list(location, packageName, kinds,
 					recurse);
 		} else if (location == StandardLocation.CLASS_PATH
 				&& kinds.contains(JavaFileObject.Kind.CLASS)) {
-			if (packageName.startsWith("java")) { // a hack to let standard
-													// manager handle locations
-													// like "java.lang" or
-													// "java.util". Prob would
-													// make sense to join
-													// results of standard
-													// manager with those of my
-													// finder here
-				return standardFileManager.list(location, packageName, kinds,
-						recurse);
-			} else { // app specific classes are here
-				try {
-//					final List<JavaFileObject> find = finder.find(packageName,kinds, recurse);
-					final List<JavaFileObject> find = finder.findAll(packageName);
-					for (JavaFileObject javaFileObject : find) {
-						fileMap.put(((CustomJavaFileObject) javaFileObject)
-								.binaryName(),
-								(CustomJavaFileObject) javaFileObject);
-					}
-					return find;
-				} catch (URISyntaxException e) {
-					e.printStackTrace();
+			try {
+				CustomJavaFileFolder folder = folderMap.get(packageName);
+				if (folder == null) {
+					folder = new CustomJavaFileFolder(bundleContext,
+							packageName);
+					folderMap.put(packageName, folder);
 				}
+				return folder.getEntries();
+			} catch (URISyntaxException e) {
+				e.printStackTrace();
 			}
+			// }
 		}
 		return Collections.emptyList();
 
@@ -181,6 +151,64 @@ public class CustomClassloaderJavaFileManager extends
 	@Override
 	public int isSupportedOption(String option) {
 		return -1;
+	}
+
+	@Override
+	public void bundleChanged(BundleEvent be) {
+		final Bundle bundle = be.getBundle();
+		switch (be.getType()) {
+			case BundleEvent.UNRESOLVED:
+			case BundleEvent.RESOLVED:
+				BundleWiring bw = bundle.adapt(BundleWiring.class);
+				Iterable<String> pkgs = getAffectedPackages(bw);
+				flush(pkgs);
+			break;
+
+			
+		}
+//		if (be.getType() == BundleEvent.UNRESOLVED) {
+//			BundleWiring bw = bundle.adapt(BundleWiring.class);
+//			System.err.println("unres: " + bw.toString());
+//		}
+//		if (be.getType() == BundleEvent.RESOLVED) {
+//			System.err.println("Bundle resolved: " + bundle.getSymbolicName());
+//			String exports = bundle.getHeaders().get("Export-Package");
+//			System.err.println("Exports: " + exports);
+//			BundleWiring bw = bundle.adapt(BundleWiring.class);
+//		}
+	}
+
+	private void flush(Iterable<String> pkgs) {
+		for (String pkg : pkgs) {
+			if(folderMap.containsKey(pkg)) {
+				logger.info("Flushed package: "+pkg);
+			}
+			folderMap.remove(pkg);
+		}
+		
+	}
+
+	private Iterable<String> getAffectedPackages(BundleWiring bw) {
+		List<String> result = new ArrayList<String>();
+		if(bw==null) {
+			return result;
+		}
+		List<BundleCapability> l = bw
+				.getCapabilities("osgi.wiring.package");
+		for (BundleCapability bundleCapability : l) {
+			String pkg = (String) bundleCapability.getAttributes().get(
+					"osgi.wiring.package");
+			logger.debug("Affected package: " + pkg);
+			result.add(pkg);
+		}
+		return result;
+	}
+
+	@Override
+	public void close() throws IOException {
+		super.close();
+		bundleContext.removeBundleListener(this);
+		fileMap.clear();
 	}
 
 }

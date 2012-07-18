@@ -1,23 +1,36 @@
 package testcompiler;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Set;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticListener;
+import javax.tools.FileObject;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaCompiler.CompilationTask;
+import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
+import javax.tools.JavaFileManager.Location;
 import javax.tools.JavaFileObject.Kind;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.wiring.BundleWiring;
 
 import testcompiler.atamur.CustomClassloaderJavaFileManager;
 import testcompiler.atamur.CustomJavaFileObject;
@@ -25,6 +38,10 @@ import testcompiler.atamur.CustomJavaFileObject;
 public class Activator implements BundleActivator {
 
 	private static BundleContext context;
+	private StandardJavaFileManager fileManager;
+	private CustomClassloaderJavaFileManager customJavaFileManager;
+	private JavaCompiler compiler;
+	private DiagnosticListener<JavaFileObject> compilerOutputListener;
 
 	static BundleContext getContext() {
 		return context;
@@ -34,63 +51,48 @@ public class Activator implements BundleActivator {
 	 * (non-Javadoc)
 	 * @see org.osgi.framework.BundleActivator#start(org.osgi.framework.BundleContext)
 	 */
+
+	public void starta(BundleContext bundleContext) throws Exception {
+		Bundle[] b = bundleContext.getBundles();
+		for (Bundle bundle : b) {
+			if(bundle.getSymbolicName().startsWith("com.dexels.navajo.document")) {
+				BundleWiring bw = bundle.adapt(BundleWiring.class);
+				System.err.println("wiring found");
+				Collection<String> cc = bw.listResources("com/dexels/navajo/document", null, BundleWiring.LISTRESOURCES_RECURSE);
+				for (String resource : cc) {
+					URL u = bundle.getResource(resource);
+					System.err.println("resource: "+resource+" = "+u);
+				}
+			}
+		}
+	}
+	
 	public void start(BundleContext bundleContext) throws Exception {
 		Activator.context = bundleContext;
-//		Compile.compile();
-//		TslCompiler.main(new String[]{"tslsrc","testtsl","-all"});
-//		TslCompiler.compileDirectory(new File("tslsrc"), new File("testtsl"), "",null,"/Users/frank/Documents/workspace42/sportlink-serv/navajo-tester/auxilary/config");
-
-//		Bundle[] b = context.getBundles();
-//		for (Bundle bundle : b) {
-//			System.err.println(">> "+bundle.getLocation());
-//			BundleWiring bw = bundle.adapt(BundleWiring.class);
-//			System.err.println("bundlew: "+bw.toString());
-//		}
-		
-		
-//		List<String> options = new ArrayList<String>();
-//		options.add("-classpath");
-//		StringBuilder sb = new StringBuilder();
-//		URLClassLoader urlClassLoader = (URLClassLoader) Thread.currentThread().getContextClassLoader();
-//		for (URL url : urlClassLoader.getURLs()) {
-//		        sb.append(url.getFile()).append(File.pathSeparator);
-//		        System.err.println(url.getFile() + ";");
-//		}
-//		options.add(sb.toString());
-		
-//		org.eclipse.jdt.internal.compiler.tool.EclipseCompiler
-		
 		final File test_src     = new File("javasrc");
 		
-//		JavaCompiler compiler = new org.eclipse.jdt.internal.compiler.tool.EclipseCompiler();
-		
-		JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-		String[] options = {"-classpath", System.getProperty("java.class.path")};
-		DiagnosticListener<JavaFileObject> listener = new DiagnosticListener<JavaFileObject>() {
+		compiler = ToolProvider.getSystemJavaCompiler();
+		compilerOutputListener = new DiagnosticListener<JavaFileObject>() {
 
 			@Override
 			public void report(Diagnostic<? extends JavaFileObject> jfo) {
-				System.err.println("PROBLEMO "+jfo.getMessage(Locale.ENGLISH));
+
+				System.err.println("PROBLEM: "+jfo.getMessage(Locale.ENGLISH));
 			}
 			
 		};
-		StandardJavaFileManager fileManager = compiler.getStandardFileManager(listener, null, null);
+		fileManager = compiler.getStandardFileManager(compilerOutputListener, null, null);
+		customJavaFileManager = new CustomClassloaderJavaFileManager(context, getClass().getClassLoader(), fileManager);
 
-		fileManager.setLocation(StandardLocation.SOURCE_PATH, Collections.singleton(test_src));
-		
-//		Iterable<? extends JavaFileObject> fileObjects = fileManager2.
+		compile(getJavaSourceFileObject("mathtest/Calculator", getExampleCode()));
+	}
 
-//		Iterable<? extends JavaFileObject> fileObjects = fileManager2.getFileForInput(new Location(), sourceFile, "club", "InitUpdateClub");
-//		File []files = new File[]{new File("javasrc/club/InitUpdateClub.java")} ;
-		 Iterable<? extends JavaFileObject> fileObjects = Arrays.asList(getJavaFileObject());
-		 
-//		Iterable<? extends JavaFileObject> fileObjects =
-//		           fileManager.getJavaFileObjectsFromFiles(Arrays.asList(files));
+	private void compile(JavaFileObject javaSource) throws IOException {
+		Iterable<? extends JavaFileObject> fileObjects = Arrays.asList(javaSource);
 
-		CustomClassloaderJavaFileManager ccjfm = new CustomClassloaderJavaFileManager(context, getClass().getClassLoader(), fileManager);
-		CompilationTask task = compiler.getTask(null, ccjfm, listener, Arrays.asList(options), null, fileObjects);
+		CompilationTask task = compiler.getTask(null, customJavaFileManager, compilerOutputListener,new ArrayList<String>(), null, fileObjects);
 		task.call();
-		CustomJavaFileObject jfo = (CustomJavaFileObject) ccjfm.getJavaFileForInput(StandardLocation.CLASS_OUTPUT, "mathtest.Calculator", Kind.CLASS);
+		CustomJavaFileObject jfo = (CustomJavaFileObject) customJavaFileManager.getJavaFileForInput(StandardLocation.CLASS_OUTPUT, "mathtest.Calculator", Kind.CLASS);
 		if (jfo==null) {
 			System.err.println("compile failed?");
 		} else {
@@ -104,31 +106,36 @@ public class Activator implements BundleActivator {
 	 * @see org.osgi.framework.BundleActivator#stop(org.osgi.framework.BundleContext)
 	 */
 	public void stop(BundleContext bundleContext) throws Exception {
+		customJavaFileManager.close();
 		Activator.context = null;
 	}
 
 	
-    private  JavaFileObject getJavaFileObject()
+	private InputStream getExampleCode() {
+        String example = 									
+        		"package mathtest;\n"+
+                "public class Calculator { \n"
+               + "  public void testAdd() { "
+               + "    System.out.println(200+300); \n"
+               + "    com.dexels.navajo.document.Navajo aaaa; \n"
+//               + "   testcompiler.Activator a = new testcompiler.Activator();} \n"
+             + "   } \n"
+               + "  public static void main(String[] args) { \n"
+               + "    Calculator cal = new Calculator(); \n"
+               + "    cal.testAdd(); \n"
+               + "  } " + "} ";	
+        return new ByteArrayInputStream(example.getBytes());
+	}
+	
+    private  JavaFileObject getJavaSourceFileObject(String className, InputStream contents)
     {
-        StringBuilder contents = new StringBuilder(
-                                                   "package mathtest;\n"+
-                                                            "public class Calculator { \n"
-                                                           + "  public void testAdd() { "
-                                                           + "    System.out.println(200+300); \n"
-//                                                           + "    com.dexels.navajo.document.Navajo aaaa; \n"
-//                                                           + "   testcompiler.Activator a = new testcompiler.Activator();} \n"
-                                                         + "   } \n"
-                                                           + "  public static void main(String[] args) { \n"
-                                                           + "    Calculator cal = new Calculator(); \n"
-                                                           + "    cal.testAdd(); \n"
-                                                           + "  } " + "} ");
+
         JavaFileObject so = null;
         try
         {
-            final String className = "mathtest/Calculator";
 //			so = new InMemoryJavaFileObject(className, contents.toString());
-            so = new CustomJavaFileObject(className, URI.create("file:///" + className.replace('.', '/')
-                    + Kind.SOURCE.extension), Kind.SOURCE, contents.toString());
+            so = new CustomJavaFileObject(className+ Kind.SOURCE.extension, URI.create("file:///" + className.replace('.', '/')
+                    + Kind.SOURCE.extension), contents, Kind.SOURCE);
         }
         catch (Exception exception)
         {
