@@ -8,7 +8,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
-import java.net.MalformedURLException;
 import java.net.URI;
 
 import javax.lang.model.element.Modifier;
@@ -25,7 +24,7 @@ public class CustomJavaFileObject implements JavaFileObject {
 	private Kind kind;
 
 	public CustomJavaFileObject(String javaObjectName, URI uri, InputStream is,
-			Kind kind) {
+			Kind kind) throws IOException {
 		this.uri = uri;
 		this.binaryName = javaObjectName;
 		this.kind = kind;
@@ -36,13 +35,7 @@ public class CustomJavaFileObject implements JavaFileObject {
 		name = javaObjectName.substring(javaObjectName.lastIndexOf('/') + 1);
 		if (is != null) {
 			baos = new ByteArrayOutputStream();
-			try {
-				IOUtils.copy(is, baos);
-			} catch (MalformedURLException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			IOUtils.copy(is, baos);
 		}
 	}
 
@@ -55,7 +48,6 @@ public class CustomJavaFileObject implements JavaFileObject {
 	public InputStream openInputStream() throws IOException {
 
 		final byte[] byteArray = baos.toByteArray();
-		System.err.println("#Bytes " + byteArray.length);
 		return new ByteArrayInputStream(byteArray);
 	}
 

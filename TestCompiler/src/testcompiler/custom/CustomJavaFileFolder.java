@@ -41,27 +41,20 @@ public class CustomJavaFileFolder {
 		List<JavaFileObject> result;
 		packageName = packageName.replaceAll("\\.", "/");
 
-		try {
 			result = new ArrayList<JavaFileObject>();
 			Bundle[] b = context.getBundles();
 			for (Bundle bundle : b) {
 				enumerateWiring(packageName, result, bundle);
 			}
-//			System.err.println("Total for package: "+packageName+": "+result.size());
 			return result;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return null;
 	}
 	
-	private void enumerateWiring(String packageName, List<JavaFileObject> result, Bundle b) throws URISyntaxException {
+	private void enumerateWiring(String packageName, List<JavaFileObject> result, Bundle b) throws URISyntaxException, IOException {
 		BundleWiring bw =  b.adapt(BundleWiring.class);
 		Collection<String> cc = bw.listResources(packageName, null, BundleWiring.LISTRESOURCES_RECURSE);
 		for (String resource : cc) {
 			URL u = b.getResource(resource);
 			if(u!=null) {
-				try {
 					InputStream openStream = null;
 					try {
 						openStream = u.openStream();
@@ -71,11 +64,6 @@ public class CustomJavaFileFolder {
 						final CustomJavaFileObject customJavaFileObject = new CustomJavaFileObject(resource, u.toURI(),null,Kind.CLASS);
 						result.add(customJavaFileObject);
 					}
-				} catch (FileNotFoundException e) {
-					e.printStackTrace();
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
 			}
 		}
 	}

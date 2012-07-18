@@ -4,10 +4,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Locale;
 
 import javax.tools.Diagnostic;
@@ -20,10 +18,10 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 
-import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
-import org.osgi.framework.wiring.BundleWiring;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import testcompiler.custom.CustomClassloaderJavaFileManager;
 import testcompiler.custom.CustomJavaFileObject;
@@ -35,31 +33,15 @@ public class Activator implements BundleActivator {
 	private CustomClassloaderJavaFileManager customJavaFileManager;
 	private JavaCompiler compiler;
 	private DiagnosticListener<JavaFileObject> compilerOutputListener;
-
+	
+	private final static Logger logger = LoggerFactory
+			.getLogger(Activator.class);
+	
 	static BundleContext getContext() {
 		return context;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.osgi.framework.BundleActivator#start(org.osgi.framework.BundleContext)
-	 */
 
-	public void starta(BundleContext bundleContext) throws Exception {
-		Bundle[] b = bundleContext.getBundles();
-		for (Bundle bundle : b) {
-			if(bundle.getSymbolicName().startsWith("com.dexels.navajo.document")) {
-				BundleWiring bw = bundle.adapt(BundleWiring.class);
-				System.err.println("wiring found");
-				Collection<String> cc = bw.listResources("com/dexels/navajo/document", null, BundleWiring.LISTRESOURCES_RECURSE);
-				for (String resource : cc) {
-					URL u = bundle.getResource(resource);
-					System.err.println("resource: "+resource+" = "+u);
-				}
-			}
-		}
-	}
-	
 	public void start(BundleContext bundleContext) throws Exception {
 		Activator.context = bundleContext;
 		
@@ -69,27 +51,30 @@ public class Activator implements BundleActivator {
 			@Override
 			public void report(Diagnostic<? extends JavaFileObject> jfo) {
 
-				System.err.println("PROBLEM: "+jfo.getMessage(Locale.ENGLISH));
+				logger.warn("Compilation problem: "+jfo.getMessage(Locale.ENGLISH));
+				
 			}
 			
 		};
 		fileManager = compiler.getStandardFileManager(compilerOutputListener, null, null);
 		customJavaFileManager = new CustomClassloaderJavaFileManager(context, getClass().getClassLoader(), fileManager);
 
-		compile(getJavaSourceFileObject("mathtest/Calculator", getExampleCode()));
+		// test the example, it shouldn't really be here, actually
+		JavaFileObject jfo = compile(getJavaSourceFileObject("mathtest/Calculator", getExampleCode()));
+		if (jfo==null) {
+			logger.error("compilation failed.");
+		} else {
+			logger.info("compilation ok.");
+		}
 	}
 
-	private void compile(JavaFileObject javaSource) throws IOException {
+	private JavaFileObject compile(JavaFileObject javaSource) throws IOException {
 		Iterable<? extends JavaFileObject> fileObjects = Arrays.asList(javaSource);
 
 		CompilationTask task = compiler.getTask(null, customJavaFileManager, compilerOutputListener,new ArrayList<String>(), null, fileObjects);
 		task.call();
 		CustomJavaFileObject jfo = (CustomJavaFileObject) customJavaFileManager.getJavaFileForInput(StandardLocation.CLASS_OUTPUT, "mathtest.Calculator", Kind.CLASS);
-		if (jfo==null) {
-			System.err.println("compile failed?");
-		} else {
-			System.err.println("jfo: "+jfo.getSize());
-		}
+		return jfo;
 	}
 	
 
@@ -109,7 +94,7 @@ public class Activator implements BundleActivator {
                 "public class Calculator { \n"
                + "  public void testAdd() { "
                + "    System.out.println(200+300); \n"
-               + "    com.dexels.navajo.document.Navajo aaaa; \n"
+               + "    org.apache.commons.io.IOUtils aaaa; \n"
 //               + "   testcompiler.Activator a = new testcompiler.Activator();} \n"
              + "   } \n"
                + "  public static void main(String[] args) { \n"
@@ -119,20 +104,11 @@ public class Activator implements BundleActivator {
         return new ByteArrayInputStream(example.getBytes());
 	}
 	
-    private  JavaFileObject getJavaSourceFileObject(String className, InputStream contents)
+    private  JavaFileObject getJavaSourceFileObject(String className, InputStream contents) throws IOException
     {
-
         JavaFileObject so = null;
-        try
-        {
-//			so = new InMemoryJavaFileObject(className, contents.toString());
             so = new CustomJavaFileObject(className+ Kind.SOURCE.extension, URI.create("file:///" + className.replace('.', '/')
                     + Kind.SOURCE.extension), contents, Kind.SOURCE);
-        }
-        catch (Exception exception)
-        {
-            exception.printStackTrace();
-        }
         return so;
     }
  

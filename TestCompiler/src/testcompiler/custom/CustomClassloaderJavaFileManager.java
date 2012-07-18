@@ -140,7 +140,7 @@ public class CustomClassloaderJavaFileManager extends
 				}
 				return folder.getEntries();
 			} catch (URISyntaxException e) {
-				e.printStackTrace();
+				logger.error("Illegal URI while listing entries for package: "+packageName,e);
 			}
 			// }
 		}
@@ -166,16 +166,7 @@ public class CustomClassloaderJavaFileManager extends
 
 			
 		}
-//		if (be.getType() == BundleEvent.UNRESOLVED) {
-//			BundleWiring bw = bundle.adapt(BundleWiring.class);
-//			System.err.println("unres: " + bw.toString());
-//		}
-//		if (be.getType() == BundleEvent.RESOLVED) {
-//			System.err.println("Bundle resolved: " + bundle.getSymbolicName());
-//			String exports = bundle.getHeaders().get("Export-Package");
-//			System.err.println("Exports: " + exports);
-//			BundleWiring bw = bundle.adapt(BundleWiring.class);
-//		}
+
 	}
 
 	private void flush(Iterable<String> pkgs) {
