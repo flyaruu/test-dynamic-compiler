@@ -1,4 +1,4 @@
-package testcompiler.custom;
+package com.dexels.osgicompiler.filemanager.impl;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;

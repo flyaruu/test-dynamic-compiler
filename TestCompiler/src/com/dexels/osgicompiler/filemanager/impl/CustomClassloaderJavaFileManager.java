@@ -1,4 +1,4 @@
-package testcompiler.custom;
+package com.dexels.osgicompiler.filemanager.impl;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -163,8 +163,6 @@ public class CustomClassloaderJavaFileManager extends
 				Iterable<String> pkgs = getAffectedPackages(bw);
 				flush(pkgs);
 			break;
-
-			
 		}
 
 	}
